@@ -4,10 +4,10 @@ services:
   prometheus:
     image: prom/prometheus
     container_name: prometheus
-    ports:
-      - "9090:9090"
+    network_mode: host
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./backup/prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--web.listen-address=:9090'
@@ -15,13 +15,26 @@ services:
   grafana:
     image: grafana/grafana-enterprise
     container_name: grafana
-    ports:
-      - "3000:3000"
+    network_mode: host
     volumes:
-      - ./prometheus-datasource.yaml:/etc/grafana/provisioning/datasources/prometheus.yaml
+      - ./config/prometheus-datasource.yaml:/etc/grafana/provisioning/datasources/prometheus.yaml
+      - ./config/grafana.ini:/etc/grafana/grafana.ini
+      - ./backup/grafana_provisioning/provisioning:/etc/grafana/provisioning
+      - ./backup/grafana_provisioning/dashboards:/var/lib/grafana/dashboards
+      - ./backup/grafana_data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 
-# networks:
-#   default:
-#     driver: host
+  # dcgm:
+  #   image: nvcr.io/nvidia/k8s/dcgm-exporter:4.3.1-4.4.0-ubuntu22.04
+  #   container_name: dcgm
+  #   network_mode: host
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   cap_add:
+  #     - SYS_ADMIN
