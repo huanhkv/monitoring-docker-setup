@@ -25,16 +25,20 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 
-  # dcgm:
-  #   image: nvcr.io/nvidia/k8s/dcgm-exporter:4.3.1-4.4.0-ubuntu22.04
-  #   container_name: dcgm
-  #   network_mode: host
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: all
-  #             capabilities: [gpu]
-  #   cap_add:
-  #     - SYS_ADMIN
+  dcgm:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.3.1-4.4.0-ubuntu22.04
+    container_name: dcgm
+    network_mode: host
+    volumes:
+      - ./dcgm-exporter:/etc/dcgm-exporter
+    environment:
+      - DCGM_EXPORTER_LISTEN=:9401
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    cap_add:
+      - SYS_ADMIN
