@@ -2,12 +2,11 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
+  # Self-monitoring
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
-  - job_name: dcgm-default
-    static_configs:
-      - targets: ["localhost:9400"]
+
   - job_name: dcgm
     static_configs:
-      - targets: ["localhost:9401"]
+      - targets: ["dcgm:9400"]

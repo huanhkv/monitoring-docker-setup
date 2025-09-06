@@ -15,6 +15,27 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--web.listen-address=:${PROMETHEUS_PORT:-9090}'
 
+  dcgm:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.3.1-4.4.0-ubuntu22.04
+    container_name: dcgm
+    networks:
+      - monitoring
+    extra_hosts:
+      - "host.local:host-gateway"
+    volumes:
+      - ./tools/dcgm-exporter:/etc/dcgm-exporter
+    environment:
+      - DCGM_EXPORTER_LISTEN=:${DCGM_EXPORTER_PORT:-9400}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    cap_add:
+      - SYS_ADMIN
+
   grafana:
     image: grafana/grafana-enterprise
     container_name: grafana
@@ -32,6 +53,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
+      - quickwit
+      - jaeger
 
 networks:
   monitoring:
