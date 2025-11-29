@@ -1,4 +1,5 @@
 services:
+
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -7,13 +8,28 @@ services:
     extra_hosts:
       - "host.local:host-gateway"
     ports:
-      - "${PROMETHEUS_PORT:-9090}:${PROMETHEUS_PORT:-9090}"
+      - "9090:9090"
     volumes:
-      - ./tools/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./tools/prometheus/prometheus-gpu.yml:/etc/prometheus/prometheus.yml
       - ./backup/prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--web.listen-address=:${PROMETHEUS_PORT:-9090}'
+      - '--web.listen-address=:9090'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
 
   dcgm:
     image: nvcr.io/nvidia/k8s/dcgm-exporter:4.3.1-4.4.0-ubuntu22.04
@@ -22,19 +38,102 @@ services:
       - monitoring
     extra_hosts:
       - "host.local:host-gateway"
+    ports:
+      - "9400:9400"
     volumes:
       - ./tools/dcgm-exporter:/etc/dcgm-exporter
     environment:
-      - DCGM_EXPORTER_LISTEN=:${DCGM_EXPORTER_PORT:-9400}
+      - DCGM_EXPORTER_LISTEN=:9400
     deploy:
       resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
         reservations:
+          memory: 256M
+          cpus: '0.25'
           devices:
             - driver: nvidia
               count: all
               capabilities: [gpu]
     cap_add:
       - SYS_ADMIN
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9400/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Elasticsearch for Jaeger storage (with persistent backup)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch-wolfi:9.2.1
+    container_name: elasticsearch
+    networks:
+      - monitoring
+    ports:
+      - "9200:9200"
+    environment:
+      # JVM Heap Settings (50% of container memory = 1GB)
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    volumes:
+      - ./tools/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - ./backup/es_data:/usr/share/elasticsearch/data
+      - ./backup/es_snapshots:/usr/share/elasticsearch/snapshots
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # Jaeger v2 - All-in-one (collector, query, and UI)
+  jaeger:
+    image: jaegertracing/jaeger:2.12.0
+    container_name: jaeger
+    networks:
+      - monitoring
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "14268:14268" # Jaeger thrift HTTP
+      - "14250:14250" # Jaeger gRPC
+      - "9411:9411"   # Zipkin compatible
+      - "16686:16686" # Jaeger UI
+      - "16685:16685" # Jaeger gRPC Query
+    environment:
+      - OTEL_TRACES_EXPORTER=otlp
+    volumes:
+      - ./tools/jaeger/jaeger.yaml:/etc/jaeger/config.yaml
+    command:
+      - "--config=/etc/jaeger/config.yaml"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:16686/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana-enterprise
@@ -42,19 +141,33 @@ services:
     networks:
       - monitoring
     ports:
-      - "${GRAFANA_PORT:-9999}:3000"
+      - "3000:3000"
     volumes:
       - ./tools/grafana/grafana.ini:/etc/grafana/grafana.ini
       - ./tools/grafana/traditional-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
       - ./backup/grafana_provisioning/provisioning:/etc/grafana/provisioning
       - ./backup/grafana_provisioning/dashboards:/var/lib/grafana/dashboards
       - ./backup/grafana_data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
     depends_on:
-      - prometheus
-      - quickwit
-      - jaeger
+      prometheus:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
 
 networks:
   monitoring:
