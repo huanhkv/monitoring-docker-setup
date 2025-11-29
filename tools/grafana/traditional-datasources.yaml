@@ -9,3 +9,12 @@ datasources:
     isDefault: true
     editable: true
     overwrite: true
+
+  - name: Jaeger
+    type: jaeger
+    version: 1
+    access: proxy
+    url: http://jaeger:16686
+    isDefault: false
+    editable: true
+    overwrite: true

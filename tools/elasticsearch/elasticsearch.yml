@@ -1,0 +1,32 @@
+# Elasticsearch Configuration for Jaeger Tracing
+
+# Cluster Configuration
+cluster.name: jaeger-cluster
+node.name: jaeger-es-node-1
+discovery.type: single-node
+
+# Network Settings
+network.host: 0.0.0.0
+http.port: 9200
+
+# Single-node cluster settings (no replicas needed)
+index.number_of_replicas: 0
+
+# Security
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+
+# Backup/Snapshot
+path.repo: /usr/share/elasticsearch/snapshots
+
+# Performance Tuning for Tracing (Optional - Uncomment if needed)
+# indices.memory.index_buffer_size: 20%
+# indices.query.bool.max_clause_count: 4096
+
+# Index Management (Optional - Uncomment if needed)
+# action.auto_create_index: true
+# action.destructive_requires_name: true
+
+# Logging (Optional - Uncomment if needed)
+# logger.org.elasticsearch: warn
+# logger.org.elasticsearch.deprecation: error
