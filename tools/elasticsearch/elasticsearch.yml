@@ -9,9 +9,6 @@ discovery.type: single-node
 network.host: 0.0.0.0
 http.port: 9200
 
-# Single-node cluster settings (no replicas needed)
-index.number_of_replicas: 0
-
 # Security
 xpack.security.enabled: false
 xpack.security.enrollment.enabled: false
