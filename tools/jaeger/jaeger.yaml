@@ -34,8 +34,6 @@ extensions:
         elasticsearch:
           server_urls: 
             - http://elasticsearch:9200
-          # num_shards: 3
-          num_replicas: 0  # Single-node cluster doesn't need replicas
 
   jaeger_query:
     storage:
